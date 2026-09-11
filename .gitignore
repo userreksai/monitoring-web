@@ -1,0 +1,20 @@
+# Frontend dependencies and output
+node_modules/
+dist/
+.pnpm-store/
+
+# Local runtime configuration
+.env
+
+# The backend is maintained in its own repository
+/monitoring-service/
+
+# Local caches and archives
+.gocache/
+.go-sdk/
+*.zip
+*.tar.gz
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
