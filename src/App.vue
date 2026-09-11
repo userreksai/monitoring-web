@@ -693,8 +693,14 @@ onMounted(async () => {
         <div class="key-settings">
           <p><b>核心告警参数</b><small>以下三个字段直接影响规则触发行为</small></p>
           <div class="form-grid key-grid">
-            <label><span>低于阈值 *</span><input v-model="ruleForm.threshold" type="number" min="0" step="0.01" inputmode="decimal" placeholder="例：1000" required /><em>元</em></label>
-            <label><span>预警浮动百分比 *</span><input v-model="ruleForm.fluctuation" type="number" min="0" max="100" step="1" required /><em>%</em></label>
+            <label>
+              <span>低于阈值 *</span>
+              <span class="unit-input"><input v-model="ruleForm.threshold" type="number" min="0" step="0.01" inputmode="decimal" placeholder="例：1000" required /><em>元</em></span>
+            </label>
+            <label>
+              <span>预警浮动百分比 *</span>
+              <span class="unit-input"><input v-model="ruleForm.fluctuation" type="number" min="0" max="100" step="1" required /><em>%</em></span>
+            </label>
             <label><span>防抖告警跨度 *</span><input v-model.trim="ruleForm.debounce" placeholder="例：10m / 1h / 1d" pattern="[0-9]+(?:\.[0-9]+)?[mMhHdD]" title="请输入数字加单位：m 表示分钟、h 表示小时、d 表示天" required /><small class="time-help">m 分钟 · h 小时 · d 天</small></label>
           </div>
         </div>
@@ -717,4 +723,3 @@ onMounted(async () => {
 
   <div class="toast" :class="{ show: toastVisible }">✓　{{ toastText }}</div>
 </template>
-
