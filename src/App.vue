@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { request, tokenStore } from "./api";
 
 const authenticated = ref(false);
@@ -7,6 +7,9 @@ const restoring = ref(Boolean(tokenStore.get()));
 const loading = ref(false);
 const currentView = ref("businesses");
 const sidebarOpen = ref(false);
+const userMenuOpen = ref(false);
+const userMenu = ref(null);
+const userMenuButton = ref(null);
 const globalSearch = ref("");
 const businesses = ref([]);
 const rules = ref([]);
@@ -119,9 +122,40 @@ function showToast(message) {
 function logout() {
   tokenStore.set("");
   authenticated.value = false;
+  userMenuOpen.value = false;
+  sidebarOpen.value = false;
+  currentView.value = "businesses";
+  loginForm.password = "";
+  passwordVisible.value = false;
+  loginError.value = "";
+  businessModalOpen.value = false;
+  ruleModalOpen.value = false;
+  recordModalOpen.value = false;
+  selectedBusinessIds.value = [];
+  globalSearch.value = "";
+  businessSearch.value = "";
+  businessStatus.value = "all";
+  ruleSearch.value = "";
+  ruleBusinessFilter.value = "全部";
+  ruleProviderFilter.value = "全部";
+  recordSearch.value = "";
+  recordBusinessFilter.value = "全部业务";
+  recordPeriod.value = "today";
   businesses.value = [];
   rules.value = [];
   records.value = [];
+  clearTimeout(toastTimer);
+  toastVisible.value = false;
+  toastText.value = "";
+}
+
+function closeUserMenu(event) {
+  if (!userMenu.value?.contains(event.target)) userMenuOpen.value = false;
+}
+
+function dismissUserMenu() {
+  userMenuOpen.value = false;
+  userMenuButton.value?.focus();
 }
 
 async function api(path, options = {}) {
@@ -419,6 +453,7 @@ function recordLevel(row) {
 }
 
 onMounted(async () => {
+  document.addEventListener("pointerdown", closeUserMenu);
   if (!tokenStore.get()) {
     restoring.value = false;
     return;
@@ -432,6 +467,11 @@ onMounted(async () => {
   } finally {
     restoring.value = false;
   }
+});
+
+onUnmounted(() => {
+  document.removeEventListener("pointerdown", closeUserMenu);
+  clearTimeout(toastTimer);
 });
 </script>
 
@@ -491,11 +531,6 @@ onMounted(async () => {
         <p>监控工作台</p>
         <button v-for="item in navItems" :key="item.id" class="nav-item" :class="{ active: currentView === item.id }" @click="switchView(item.id)"><span>{{ item.icon }}</span>{{ item.label }}</button>
       </nav>
-      <div class="throughput">
-        <div><span>事件吞吐率</span><b>99.98%</b></div>
-        <div class="mini-progress"><i></i></div>
-        <small><span>已处理 {{ records.length.toLocaleString("zh-CN") }} 条</span><span>无积压</span></small>
-      </div>
     </aside>
 
     <div v-if="sidebarOpen" class="sidebar-mask" @click="sidebarOpen = false"></div>
@@ -507,9 +542,13 @@ onMounted(async () => {
         <span class="instant-mode">ϟ 即时响应模式已开启</span>
         <div class="top-actions">
           <button title="刷新数据" :disabled="loading" @click="refreshData">↻</button>
-          <button class="notice" title="通知中心">♢</button>
-          <button title="健康状态">♧</button>
-          <div class="operator"><span><b>运维中心主控</b><small>ops-master@cloud.local</small></span><i>管</i></div>
+          <div ref="userMenu" class="operator" @keydown.esc.stop.prevent="dismissUserMenu" @focusout="!$event.currentTarget.contains($event.relatedTarget) && (userMenuOpen = false)">
+            <span><b>运维中心主控</b><small>ops-master@cloud.local</small></span>
+            <button ref="userMenuButton" type="button" class="avatar-button" aria-label="用户菜单" :aria-expanded="userMenuOpen" aria-controls="user-menu" @click="userMenuOpen = !userMenuOpen">管</button>
+            <div v-if="userMenuOpen" id="user-menu" class="user-menu">
+              <button type="button" @click="logout">退出登录</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -551,7 +590,7 @@ onMounted(async () => {
                     <td class="metric">{{ row.rules }} 条监控流</td>
                     <td><label class="switch"><input type="checkbox" :checked="row.enabled" @change="toggleBusiness(row, $event.target.checked)" /><i></i><span>{{ row.enabled ? "开启" : "暂停" }}</span></label></td>
                     <td class="metric time-cell">{{ row.time }}</td>
-                    <td><div class="row-actions"><button @click="showToast(`${row.name}：${row.rules} 条监控流，接入时间 ${row.time}`)">详情</button><button @click="openBusinessModal(row)">编辑</button><button @click="deleteBusiness(row)">删除</button></div></td>
+                    <td><div class="row-actions"><button @click="openBusinessModal(row)">编辑</button><button @click="deleteBusiness(row)">删除</button></div></td>
                   </tr>
                   <tr v-if="!filteredBusinesses.length"><td colspan="8" class="empty-cell">没有符合条件的告警业务</td></tr>
                 </tbody>
