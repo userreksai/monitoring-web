@@ -454,15 +454,13 @@ onMounted(async () => {
         <div class="telemetry-card">
           <div class="telemetry-scene">
             <img
-              alt="企业级告警监控可视化"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDzCY5fDvnM4WWahYR97WXj2DGrtIw05Joi0ipVqgcejnK3W9xRiwVj0czWSEzKF9ZnPQqQlrX5zLzsJuxyRcKbd5wJ69xQaX-aigXwekTL4aPpH_YrelqGqVDXH1NQq2VVULVqBZa2MZEiOxS4mXCHdShMFrQEm2chnhUKigq0t4vXBrKipjU0KP0twdiPhVcEy4JKkwDyOfDvV4rX7rJUMzuFJF8R_0Uc2vR797KNdseybkwSb2EEEw"
+              alt="蓝青色监控大屏连接服务器与云端网络节点"
+              src="/monitoring-illustration.png"
+              width="1536"
+              height="1024"
             />
           </div>
           <div class="telemetry-status"><span><i></i>集群状态：巡检就绪</span><b>≋ 99.99%</b></div>
-        </div>
-        <div class="visual-note">
-          <span>✓</span>
-          <div><b>企业级运维中枢</b><p>统一汇聚全链路监控指标，秒级响应高危事件，保障核心架构稳定自如。</p></div>
         </div>
       </div>
       <div class="login-form-wrap">
