@@ -1,0 +1,25 @@
+[Unit]
+Description=Grafana SMS balance monitor
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# 路径或运行用户不同时，使用 install-monitor-service.sh 自动生成。
+User=root
+WorkingDirectory=/opt/monitoring-alert
+ExecStart=/opt/monitoring-alert/.venv/bin/python -u /opt/monitoring-alert/grafana_balance_monitor.py --env-file /opt/monitoring-alert/monitor.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONIOENCODING=utf-8
+Restart=on-failure
+RestartSec=15s
+TimeoutStopSec=120s
+UMask=0077
+NoNewPrivileges=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=grafana-balance-monitor
+
+[Install]
+WantedBy=multi-user.target
