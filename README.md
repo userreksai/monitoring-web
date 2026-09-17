@@ -1,5 +1,7 @@
 # 短信计费监控前端
 
+数据库已改为原定 MySQL `sms_billing_monitor`。监控程序与后端的升级步骤见 [MYSQL_UPGRADE.md](MYSQL_UPGRADE.md)，本次跨数据库切换请使用该文档中的完整交付包流程。
+
 这是短信计费监控管理平台的 Vue 3 + Vite 前端，包含登录、告警业务、告警设置和告警记录页面。前端通过 `/api` 调用独立的 Go 后端服务：
 
 - 前端仓库：<https://github.com/userreksai/monitoring-web>

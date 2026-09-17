@@ -5,6 +5,13 @@ dist/
 
 # Local runtime configuration
 .env
+monitor.env
+monitor-state.sqlite3*
+__pycache__/
+.python-deps/
+.mysql-test/
+.venv/
+.convert_*.py
 
 # The backend is maintained in its own repository
 /monitoring-service/
