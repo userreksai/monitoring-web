@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { request, tokenStore } from "./api";
+import Pagination from "./Pagination.vue";
+import { usePagination } from "./usePagination";
+import { createRuleDefaults } from "./ruleDefaults";
 
 const authenticated = ref(false);
 const restoring = ref(Boolean(tokenStore.get()));
@@ -67,12 +70,14 @@ const filteredBusinesses = computed(() => {
   });
 });
 
+const businessPagination = usePagination(filteredBusinesses, [businessSearch, businessStatus]);
+
 const allBusinessesSelected = computed({
   get() {
-    return filteredBusinesses.value.length > 0 && filteredBusinesses.value.every((row) => selectedBusinessIds.value.includes(row.id));
+    return businessPagination.items.length > 0 && businessPagination.items.every((row) => selectedBusinessIds.value.includes(row.id));
   },
   set(checked) {
-    const visibleIds = filteredBusinesses.value.map((row) => row.id);
+    const visibleIds = businessPagination.items.map((row) => row.id);
     selectedBusinessIds.value = checked
       ? [...new Set([...selectedBusinessIds.value, ...visibleIds])]
       : selectedBusinessIds.value.filter((id) => !visibleIds.includes(id));
@@ -91,6 +96,8 @@ const filteredRules = computed(() => {
   });
 });
 
+const rulePagination = usePagination(filteredRules, [ruleSearch, ruleBusinessFilter, ruleProviderFilter]);
+
 const activeRuleCount = computed(() => rules.value.filter((row) => row.enabled).length);
 const sensitiveRuleCount = computed(() => rules.value.filter((row) => Number(row.fluctuation) >= 40).length);
 const minimumDebounce = computed(() => {
@@ -107,6 +114,8 @@ const filteredRecords = computed(() => {
     return matchesQuery && matchesBusiness;
   });
 });
+const recordPagination = usePagination(filteredRecords, [recordSearch, recordBusinessFilter, recordPeriod]);
+
 const pendingRecordCount = computed(() => records.value.filter((row) => row.status === "待处理").length);
 const confirmedRecordCount = computed(() => records.value.filter((row) => row.status === "已确认").length);
 const statusTypeCount = computed(() => new Set(records.value.map((row) => row.status)).size);
@@ -331,7 +340,7 @@ function openRuleModal(row = null) {
   const parent = row?.parent || businesses.value[0]?.code || "";
   Object.assign(ruleForm, row
     ? { code: row.code, parent: row.parent, business: row.business, provider: row.provider, account: row.account, threshold: row.threshold, fluctuation: row.fluctuation, debounce: row.debounce, purpose: row.purpose, tag: row.tag || "", enabled: Boolean(row.enabled) }
-    : { code: "", parent, business: businesses.value.find((item) => item.code === parent)?.name || "", provider: "", account: "", threshold: "", fluctuation: 0, debounce: "10m", purpose: "", tag: "", enabled: true });
+    : createRuleDefaults(parent, businesses.value.find((item) => item.code === parent)?.name || "", rules.value));
   ruleModalOpen.value = true;
 }
 
@@ -582,7 +591,7 @@ onUnmounted(() => {
               <table>
                 <thead><tr><th><input v-model="allBusinessesSelected" type="checkbox" aria-label="选择当前全部业务" /></th><th>ID</th><th>唯一编码</th><th>业务名称</th><th>关联子规则</th><th>是否开启通知</th><th>接入时间</th><th>操作</th></tr></thead>
                 <tbody>
-                  <tr v-for="row in filteredBusinesses" :key="row.id">
+                  <tr v-for="row in businessPagination.items" :key="row.id">
                     <td><input v-model="selectedBusinessIds" class="row-check" type="checkbox" :value="row.id" :aria-label="`选择业务 ${row.name}`" /></td>
                     <td class="metric">{{ row.id }}</td>
                     <td><span class="code">{{ row.code }}</span></td>
@@ -596,7 +605,7 @@ onUnmounted(() => {
                 </tbody>
               </table>
             </div>
-            <footer class="pagination"><div>共 <b>{{ filteredBusinesses.length }}</b> 条记录，当前显示 1-{{ filteredBusinesses.length }} 条　<select><option>10条/页</option><option>20条/页</option><option>50条/页</option></select></div><div><button disabled>‹</button><button class="active">1</button><label>前往 <input value="1" /> 页</label><button>跳转</button></div></footer>
+            <Pagination :pagination="businessPagination" />
           </div>
         </section>
 
@@ -629,7 +638,7 @@ onUnmounted(() => {
               <table class="rules-table">
                 <thead><tr><th>详细唯一编码</th><th>所属业务</th><th>厂商 / 账号</th><th>低于阈值预警</th><th>浮动百分比</th><th>防抖告警跨度</th><th>业务用途 / 标签</th><th>通知开关</th><th>操作</th></tr></thead>
                 <tbody>
-                  <tr v-for="row in filteredRules" :key="row.code">
+                  <tr v-for="row in rulePagination.items" :key="row.code">
                     <td><b class="rule-code">#{{ row.code }}</b><small>（父编码: {{ row.parent }}）</small></td>
                     <td><span class="dot green"></span>{{ row.business }}</td>
                     <td><b>{{ row.provider }}</b><small class="block">{{ row.account }}</small></td>
@@ -644,7 +653,7 @@ onUnmounted(() => {
                 </tbody>
               </table>
             </div>
-            <footer class="pagination"><div>共 <b>{{ filteredRules.length }}</b> 条配置规则　每页展示：<select><option>10 条/页</option><option>20 条/页</option><option>50 条/页</option></select></div><div><button disabled>‹</button><button class="active">1</button><label>跳至 <input value="1" /> 页</label><button>确认</button></div></footer>
+            <Pagination :pagination="rulePagination" />
           </div>
         </section>
 
@@ -677,7 +686,7 @@ onUnmounted(() => {
               <table class="records-table">
                 <thead><tr><th><input type="checkbox" aria-label="选择全部告警记录" /></th><th>ID</th><th>告警时间</th><th>业务详细编码</th><th>业务名称</th><th>厂商与账号</th><th>告警内容及异常特征</th><th>状态</th><th>操作</th></tr></thead>
                 <tbody>
-                  <tr v-for="row in filteredRecords" :key="row.id">
+                  <tr v-for="row in recordPagination.items" :key="row.id">
                     <td><input type="checkbox" :aria-label="`选择告警记录 ${row.id}`" /></td>
                     <td class="metric">#{{ row.id }}</td>
                     <td><b class="record-time">{{ row.time }}</b><small class="block">{{ row.date }}</small></td>
@@ -692,7 +701,7 @@ onUnmounted(() => {
                 </tbody>
               </table>
             </div>
-            <footer class="pagination"><div>显示第 <b>{{ filteredRecords.length ? 1 : 0 }}</b> 到 <b>{{ filteredRecords.length }}</b> 条，共 <b>{{ filteredRecords.length }}</b> 条记录　每页 <select><option>10 条</option><option>20 条</option><option>50 条</option></select></div><div><button disabled>‹ 上一页</button><button class="active">1</button><button disabled>下一页 ›</button><label>前往 <input value="1" /> 页</label><button>确定</button></div></footer>
+            <Pagination :pagination="recordPagination" />
           </div>
         </section>
       </main>
