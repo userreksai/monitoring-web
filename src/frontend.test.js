@@ -56,10 +56,13 @@ test("filters reset pages even when count is unchanged; deletion and empty data 
 });
 
 test("new rule defaults contain fresh random codes and a 1000 currency threshold", () => {
-  const rules = Array.from({ length: 1000 }, () => createRuleDefaults("123456", "短信商"));
+  const rules = [];
+  for (let index = 0; index < 1000; index += 1) {
+    rules.push(createRuleDefaults("123456", "短信商", rules));
+  }
   assert.equal(new Set(rules.map((rule) => rule.code)).size, rules.length);
   for (const rule of rules) {
-    assert.match(rule.code, /^[0-9a-f]{32}$/);
+    assert.match(rule.code, /^[1-9][0-9]{5}$/);
     assert.equal(rule.threshold, 1000);
     assert.equal(rule.parent, "123456");
     assert.equal(rule.business, "短信商");
