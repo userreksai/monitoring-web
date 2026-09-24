@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { request, tokenStore } from "./api";
 import Pagination from "./Pagination.vue";
 import { usePagination } from "./usePagination";
 import { createRuleDefaults } from "./ruleDefaults";
+import { useRuleBusiness } from "./useRuleBusiness";
 
 const authenticated = ref(false);
 const restoring = ref(Boolean(tokenStore.get()));
@@ -16,6 +17,8 @@ const userMenuButton = ref(null);
 const globalSearch = ref("");
 const businesses = ref([]);
 const rules = ref([]);
+const { selectedId: selectedRuleBusinessId, selectedBusiness: selectedRuleBusiness, businessRules } = useRuleBusiness(businesses, rules);
+const ruleMenuExpanded = ref(true);
 const records = ref([]);
 const dashboardStats = reactive({ businesses: 0, enabledBusinesses: 0, todayAlerts: 0 });
 
@@ -32,7 +35,6 @@ const editingBusinessId = ref(null);
 const businessForm = reactive({ code: "", name: "", tag: "", description: "", enabled: true, tone: "green" });
 
 const ruleSearch = ref("");
-const ruleBusinessFilter = ref("全部");
 const ruleProviderFilter = ref("全部");
 const ruleModalOpen = ref(false);
 const editingRuleCode = ref("");
@@ -84,25 +86,24 @@ const allBusinessesSelected = computed({
   },
 });
 
-const ruleBusinesses = computed(() => [...new Set(rules.value.map((row) => row.business).filter(Boolean))]);
-const ruleProviders = computed(() => [...new Set(rules.value.map((row) => row.provider).filter(Boolean))]);
+watch(selectedRuleBusinessId, resetRuleFilters);
+const ruleProviders = computed(() => [...new Set(businessRules.value.map((row) => row.provider).filter(Boolean))]);
 const filteredRules = computed(() => {
   const query = ruleSearch.value.trim().toLowerCase();
-  return rules.value.filter((row) => {
+  return businessRules.value.filter((row) => {
     const matchesQuery = !query || Object.values(row).join(" ").toLowerCase().includes(query);
-    const matchesBusiness = ruleBusinessFilter.value === "全部" || row.business === ruleBusinessFilter.value;
     const matchesProvider = ruleProviderFilter.value === "全部" || row.provider === ruleProviderFilter.value;
-    return matchesQuery && matchesBusiness && matchesProvider;
+    return matchesQuery && matchesProvider;
   });
 });
 
-const rulePagination = usePagination(filteredRules, [ruleSearch, ruleBusinessFilter, ruleProviderFilter]);
+const rulePagination = usePagination(filteredRules, [ruleSearch, selectedRuleBusinessId, ruleProviderFilter]);
 
-const activeRuleCount = computed(() => rules.value.filter((row) => row.enabled).length);
-const sensitiveRuleCount = computed(() => rules.value.filter((row) => Number(row.fluctuation) >= 40).length);
+const activeRuleCount = computed(() => businessRules.value.filter((row) => row.enabled).length);
+const sensitiveRuleCount = computed(() => businessRules.value.filter((row) => Number(row.fluctuation) >= 40).length);
 const minimumDebounce = computed(() => {
-  if (!rules.value.length) return "--";
-  return [...rules.value].sort((a, b) => debounceToMinutes(a.debounce) - debounceToMinutes(b.debounce))[0]?.debounce || "--";
+  if (!businessRules.value.length) return "--";
+  return [...businessRules.value].sort((a, b) => debounceToMinutes(a.debounce) - debounceToMinutes(b.debounce))[0]?.debounce || "--";
 });
 
 const recordBusinesses = computed(() => [...new Set(records.value.map((row) => row.business).filter(Boolean))]);
@@ -145,7 +146,6 @@ function logout() {
   businessSearch.value = "";
   businessStatus.value = "all";
   ruleSearch.value = "";
-  ruleBusinessFilter.value = "全部";
   ruleProviderFilter.value = "全部";
   recordSearch.value = "";
   recordBusinessFilter.value = "全部业务";
@@ -224,6 +224,12 @@ function switchView(view) {
   currentView.value = view;
   sidebarOpen.value = false;
   globalSearch.value = view === "businesses" ? businessSearch.value : view === "rules" ? ruleSearch.value : recordSearch.value;
+}
+
+function selectRuleBusiness(row) {
+  selectedRuleBusinessId.value = row.id;
+  resetRuleFilters();
+  switchView("rules");
 }
 
 function applyGlobalSearch() {
@@ -326,7 +332,6 @@ function randomBusinessCode() {
 
 function resetRuleFilters() {
   ruleSearch.value = "";
-  ruleBusinessFilter.value = "全部";
   ruleProviderFilter.value = "全部";
   if (currentView.value === "rules") globalSearch.value = "";
 }
@@ -337,7 +342,7 @@ function syncRuleBusiness() {
 
 function openRuleModal(row = null) {
   editingRuleCode.value = row?.code || "";
-  const parent = row?.parent || businesses.value[0]?.code || "";
+  const parent = row?.parent || selectedRuleBusiness.value?.code || "";
   Object.assign(ruleForm, row
     ? { code: row.code, parent: row.parent, business: row.business, provider: row.provider, account: row.account, threshold: row.threshold, fluctuation: row.fluctuation, debounce: row.debounce, purpose: row.purpose, tag: row.tag || "", enabled: Boolean(row.enabled) }
     : createRuleDefaults(parent, businesses.value.find((item) => item.code === parent)?.name || "", rules.value));
@@ -538,7 +543,14 @@ onUnmounted(() => {
       <div class="probe"><span>✓</span><small>全链路探针巡检正常</small><i></i></div>
       <nav>
         <p>监控工作台</p>
-        <button v-for="item in navItems" :key="item.id" class="nav-item" :class="{ active: currentView === item.id }" @click="switchView(item.id)"><span>{{ item.icon }}</span>{{ item.label }}</button>
+        <template v-for="item in navItems" :key="item.id">
+          <button v-if="item.id === 'rules'" class="nav-item" :class="{ 'nav-parent-active': currentView === 'rules' }" :aria-expanded="ruleMenuExpanded" aria-controls="rule-business-menu" @click="ruleMenuExpanded = !ruleMenuExpanded"><span>{{ item.icon }}</span>{{ item.label }}<i class="nav-chevron">{{ ruleMenuExpanded ? '⌄' : '›' }}</i></button>
+          <button v-else class="nav-item" :class="{ active: currentView === item.id }" @click="switchView(item.id)"><span>{{ item.icon }}</span>{{ item.label }}</button>
+          <div v-if="item.id === 'rules'" v-show="ruleMenuExpanded" id="rule-business-menu" class="nav-submenu">
+            <button v-for="business in businesses" :key="business.id" class="nav-item nav-child" :class="{ active: currentView === 'rules' && selectedRuleBusinessId === business.id }" :aria-current="currentView === 'rules' && selectedRuleBusinessId === business.id ? 'page' : undefined" :title="business.name" @click="selectRuleBusiness(business)">{{ business.name }}</button>
+            <small v-if="!businesses.length" class="nav-empty">暂无业务，请先添加告警业务</small>
+          </div>
+        </template>
       </nav>
     </aside>
 
@@ -612,21 +624,21 @@ onUnmounted(() => {
         <section v-else-if="currentView === 'rules'">
           <div class="section-heading">
             <div>
-              <div class="breadcrumbs">控制台　/　告警业务　/　<span>告警设置</span></div>
-              <div class="title-line"><h1>规则与阈值配置</h1><em>CONFIG-v2.4</em></div>
+              <div class="breadcrumbs">控制台　/　告警设置　/　<span>{{ selectedRuleBusiness?.name || '暂无业务' }}</span></div>
+              <div class="title-line"><h1>{{ selectedRuleBusiness?.name || '暂无告警业务' }}</h1></div>
             </div>
-            <div class="heading-buttons"><button class="blue-button" @click="openRuleModal()">⊕ 新增告警规则</button></div>
+            <div class="heading-buttons"><button class="blue-button" :disabled="!selectedRuleBusiness" @click="openRuleModal()">⊕ 新增告警规则</button></div>
           </div>
 
           <div class="summary-grid rules-summary">
-            <article><span>♢</span><div><small>生效中监控规则</small><strong>{{ activeRuleCount }} <i>/ {{ rules.length }} 条总计</i></strong><em>通知状态来自规则配置</em></div></article>
+            <article><span>♢</span><div><small>生效中监控规则</small><strong>{{ activeRuleCount }} <i>/ {{ businessRules.length }} 条总计</i></strong><em>通知状态来自规则配置</em></div></article>
             <article><span>⌁</span><div><small>高浮动预警配置（≥40%）</small><strong>{{ sensitiveRuleCount }} <i>条高灵敏度策略</i></strong><em>依据预警浮动百分比统计</em></div></article>
             <article><span>◷</span><div><small>最短防抖告警跨度</small><strong>{{ minimumDebounce }} <i>m 分钟 · h 小时 · d 天</i></strong><em>用户可自由输入数值与单位</em></div></article>
             <article><span>☁</span><div><small>规则厂商分布</small><strong class="provider-count">{{ ruleProviders.length }} 家</strong><em>{{ ruleProviders.join("　") || "暂无厂商" }}</em></div></article>
           </div>
 
           <div class="rule-filters">
-            <div><b>业务:</b><button class="chip" :class="{ active: ruleBusinessFilter === '全部' }" @click="ruleBusinessFilter = '全部'">全部</button><button v-for="name in ruleBusinesses" :key="name" class="chip" :class="{ active: ruleBusinessFilter === name }" @click="ruleBusinessFilter = name">{{ name }}</button></div>
+            <div><b>业务:</b><span>{{ selectedRuleBusiness?.name || '请先添加告警业务' }}</span></div>
             <div><b>厂商:</b><button class="chip" :class="{ active: ruleProviderFilter === '全部' }" @click="ruleProviderFilter = '全部'">全部</button><button v-for="provider in ruleProviders" :key="provider" class="chip" :class="{ active: ruleProviderFilter === provider }" @click="ruleProviderFilter = provider">{{ provider }}</button></div>
             <label class="mini-search">⌕ <input v-model="ruleSearch" placeholder="搜索详细唯一编码 / 账号 / 业务用途..." /></label>
             <button class="reset-button" @click="resetRuleFilters">⌁ 重置</button>

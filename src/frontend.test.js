@@ -3,6 +3,39 @@ import assert from "node:assert/strict";
 import { computed, effectScope, ref } from "vue";
 import { usePagination } from "./usePagination.js";
 import { createRuleDefaults } from "./ruleDefaults.js";
+import { useRuleBusiness } from "./useRuleBusiness.js";
+
+test("business menus track additions, renames and deletion and isolate rules by parent code", () => {
+  const scope = effectScope();
+  scope.run(() => {
+    const businesses = ref([]);
+    const rules = ref([
+      { code: "1", parent: "sms", business: "旧名称" },
+      { code: "2", parent: "other", business: "短信资源余额" },
+    ]);
+    const { selectedId, selectedBusiness, businessRules } = useRuleBusiness(businesses, rules);
+    assert.deepEqual(businessRules.value, []);
+    businesses.value = [{ id: 1, code: "other", name: "其他业务" }, { id: 2, code: "sms", name: "短信资源余额" }];
+    assert.equal(selectedId.value, 2);
+    assert.deepEqual(businessRules.value.map((row) => row.code), ["1"]);
+    businesses.value = [...businesses.value, { id: 3, code: "new", name: "新业务" }];
+    selectedId.value = 3;
+    assert.equal(selectedBusiness.value.name, "新业务");
+    assert.deepEqual(businessRules.value, []);
+    businesses.value = businesses.value.map((row) => row.id === 3 ? { ...row, name: "已改名" } : row);
+    assert.equal(selectedId.value, 3);
+    assert.equal(selectedBusiness.value.name, "已改名");
+    businesses.value = businesses.value.filter((row) => row.id !== 3);
+    assert.equal(selectedId.value, 2);
+    selectedId.value = 1;
+    assert.deepEqual(businessRules.value.map((row) => row.code), ["2"]);
+    businesses.value = [];
+    assert.equal(selectedId.value, null);
+    assert.equal(selectedBusiness.value, undefined);
+    assert.deepEqual(businessRules.value, []);
+  });
+  scope.stop();
+});
 
 test("pagination slices rows, clamps jumps, and resets page size", () => {
   const scope = effectScope();
